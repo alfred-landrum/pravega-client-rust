@@ -170,8 +170,8 @@
                     <main>
                         <h1><a class="header" href="#pravega-rust-client-and-pravega-language-bindings-user-guide" id="pravega-rust-client-and-pravega-language-bindings-user-guide">Pravega Rust Client and Pravega language bindings user guide.</a></h1>
 <p>Welcome to the Pravega Rust client and Pravega language bindings user guide! This book is a companion to 
-<a href="https://docs.rs/pravega-client/0.2.0/pravega_client/">Pravega Rust Client</a> and the supported language bindings over the Pravega Rust
-Client. At the moment this repository supports <a href="https://github.com/pravega/pravega-client-rust/tree/master/python_binding">Python binding</a> to Pravega.</p>
+<a href="https://docs.rs/pravega-client/0.3.1/pravega_client/">Pravega Rust Client</a> and the supported language bindings over the Pravega Rust
+Client. At the moment this repository supports <a href="https://github.com/pravega/pravega-client-rust/tree/master/python">Python binding</a> to Pravega.</p>
 <p>This book contains examples and documentation to explain all of Pravega Rust client's use cases in detail and the Python
 language binding.</p>
 <p>Please choose from the chapters on the left to jump to individual topics, or continue below to start with Pravega Rust Clients's README.</p>
@@ -349,9 +349,9 @@ then it reaches the end of segment and no more data could be read from this offs
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>let offset = byte_reader.current_head().expect(&quot;get current head offset&quot;);
+</span>let offset = byte_reader.current_head().await.expect(&quot;get current head offset&quot;);
 let mut buf: Vec&lt;u8&gt; = vec![0; 4];
-let size = byte_reader.read(&amp;mut buf).expect(&quot;read from byte stream&quot;);
+let size = byte_reader.read(&amp;mut buf).await.expect(&quot;read from byte stream&quot;);
 <span class="boring">}
 </span></code></pre></pre>
 <h3><a class="header" href="#put-it-together" id="put-it-together">Put it together</a></h3>
@@ -360,7 +360,8 @@ use pravega_client::client_factory::ClientFactory;
 use pravega_client_shared::ScopedSegment;
 use std::io::Write;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let config = ClientConfigBuilder::default()
      .controller_uri(&quot;localhost:9090&quot;)
      .build()
@@ -372,24 +373,24 @@ fn main() {
     
     // write
     let mut byte_writer = client_factory.create_byte_writer(segment);
-    byte_writer.seek_to_tail();
+    byte_writer.seek_to_tail().await;
     
     let payload = &quot;hello world&quot;.to_string().into_bytes();
     
-    byte_writer.write(&amp;payload).expect(&quot;write&quot;);
-    byte_writer.flush().expect(&quot;flush&quot;);
+    byte_writer.write(&amp;payload).await.expect(&quot;write&quot;);
+    byte_writer.flush().await.expect(&quot;flush&quot;);
 
-    client_factory.runtime().block_on(byte_writer.truncate_data_before(4)).expect(&quot;truncate segment&quot;);
+    byte_writer.truncate_data_before(4).await.expect(&quot;truncate segment&quot;);
 
-    client_factory.runtime().block_on(byte_writer.seal()).expect(&quot;seal segment&quot;);
+    byte_writer.seal().await.expect(&quot;seal segment&quot;);
 
     // read
     let segment = ScopedSegment::from(&quot;myscope/mystream/0&quot;);
-    let mut byte_reader = client_factory.create_byte_reader(segment);
+    let mut byte_reader = client_factory.create_byte_reader(segment).await;
 
-    let offset = byte_reader.current_head().expect(&quot;get current head offset&quot;);
+    let offset = byte_reader.current_head().await.expect(&quot;get current head offset&quot;);
     let mut buf: Vec&lt;u8&gt; = vec![0; 4];
-    let size = byte_reader.read(&amp;mut buf).expect(&quot;read from byte stream&quot;);
+    let size = byte_reader.read(&amp;mut buf).await.expect(&quot;read from byte stream&quot;);
 }
 </code></pre></pre>
 <p>For more details please refer <a href="Rust/../doc/pravega_client/byte">API docs</a>.</p>
@@ -403,32 +404,32 @@ fn main() {
 <h1><a class="header" href="#python-binding" id="python-binding">Python Binding</a></h1>
 <p>The below section provides a Pravega Python API tutorial for the Rust based Pravega Native client. This tutorial is a 
 companion to <a href="Python/../python/pravega_client.html">Pravega Python API</a></p>
-<p>Also, check out the <a href="https://github.com/pravega/pravega-client-rust/tree/master/python_binding">repo</a>.</p>
+<p>Also, check out the <a href="https://github.com/pravega/pravega-client-rust/tree/master/python">repo</a>.</p>
 <h2><a class="header" href="#streammanager" id="streammanager">StreamManager</a></h2>
 <p>A StreamManger is used to create a Scopes, Streams, Writers and Readers. It can also be used to perform
 operations on the stream which include sealing a stream and deleting streams among others.</p>
 <p>A StreamManager can be created by using a Controller URI. The below example snippet </p>
 <pre><code class="language-python">import pravega_client
-manager=pravega_client.StreamManager(&quot;127.0.0.1:9090&quot;)
+manager=pravega_client.StreamManager(&quot;tcp://127.0.0.1:9090&quot;)
 # stream manager can be used to create scopes, streams, writers and readers against Pravega.
 manager.create_scope(&quot;scope&quot;)
 manager.create_stream(&quot;scope&quot;, &quot;stream&quot;, 1)
 </code></pre>
 <p>A StreamWriter can be used create a Stream writer. The below snippet is shows a sample pattern.</p>
 <pre><code class="language-python">import pravega_client
-manager=pravega_client.StreamManager(&quot;127.0.0.1:9090&quot;)
+manager=pravega_client.StreamManager(&quot;tcp://127.0.0.1:9090&quot;)
 # create a writer against an already created Pravega scope and Stream.
 writer=manager.create_writer(&quot;scope&quot;, &quot;stream&quot;)
 </code></pre>
 <p>A transactional Writer can be created using the StreamManager. The below example snippet shows a sample pattern.</p>
 <pre><code class="language-python"> import pravega_client
- manager=pravega_client.StreamManager(&quot;127.0.0.1:9090&quot;)
+ manager=pravega_client.StreamManager(&quot;tcp://127.0.0.1:9090&quot;)
 # create a transactional writer against an already created Pravega scope and Stream.
  writer=manager.create_transaction_writer(&quot;scope&quot;, &quot;stream&quot;, &quot;123&quot;)
 </code></pre>
 <p>A ReaderGroup can be created using the StreamManager. Individual readers can be created using this ReaderGroup object.</p>
 <pre><code class="language-python">import pravega_client
-manager=pravega_client.StreamManager(&quot;127.0.0.1:9090&quot;)
+manager=pravega_client.StreamManager(&quot;tcp://127.0.0.1:9090&quot;)
 # create a ReaderGroup rg1 against an already created Pravega scope and Stream.
 event.reader_group=manager.create_reader_group(&quot;rg1&quot;, &quot;scope&quot;, &quot;stream&quot;)
 </code></pre>
@@ -440,7 +441,7 @@ with/without a routing key.</p>
 <p>Note that the implementation provides retry logic to handle connection failures and service host failures. Internal 
 retries will not violate the exactly-once semantic, so it is better to rely on them than to wrap this with custom retry logic.</p>
 <pre><code class="language-python">import pravega_client
-manager=pravega_client.StreamManager(&quot;127.0.0.1:9090&quot;)
+manager=pravega_client.StreamManager(&quot;tcp://127.0.0.1:9090&quot;)
 # assuming the Pravega scope and stream are already created.
 writer=manager.create_writer(&quot;scope&quot;, &quot;stream&quot;)
 # write into Pravega stream without specifying the routing key.
@@ -461,7 +462,7 @@ written as part of a transaction can be committed atomically by calling commit()
 events going into the stream or none of them and the commit call failing with an exception.</p>
 <p>Prior to committing a transaction, the events written to it cannot be read or otherwise seen by readers.</p>
 <pre><code class="language-python">import pravega_client                                         
-manager = pravega_client.StreamManager(&quot;127.0.0.1:9090&quot;)        
+manager = pravega_client.StreamManager(&quot;tcp://127.0.0.1:9090&quot;)        
 w1 = stream_manager.create_transaction_writer(scope,&quot;testTxn&quot;, 1)
 # Begin a Transaction
 txn1 = w1.begin_txn()
@@ -488,7 +489,7 @@ stream. The reader ensures that events returned by the stream are in order.</p>
 the responsibility of reading from different segments in the Pravega stream.</p>
 <p>A sample example snippet is shown below.</p>
 <pre><code class="language-python">import pravega_client
-manager = pravega_client.StreamManager(&quot;127.0.0.1:9090&quot;)
+manager = pravega_client.StreamManager(&quot;tcp://127.0.0.1:9090&quot;)
 # assuming the Pravega scope and stream are already created.
 reader_group = manager.create_reader_group(&quot;rg1&quot;, &quot;scope&quot;, &quot;stream&quot;)
 reader = reader_group.create_reader(&quot;reader_id&quot;);
